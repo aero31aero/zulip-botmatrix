@@ -1,0 +1,5 @@
+flask
+GitHub-Flask
+Flask-SQLAlchemy
+Werkzeug
+requests

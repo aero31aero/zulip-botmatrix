@@ -1,0 +1,18 @@
+#! /usr/bin/env bash
+
+echo "Setup: Setting up Virtual Env"
+
+BASEDIR=`dirname $0`/..
+
+if [ ! -d "$BASEDIR/env" ]; then
+    virtualenv --python=python3 -q $BASEDIR/env
+    echo "Virtualenv created."
+fi
+
+source $BASEDIR/env/bin/activate
+
+if [ ! -f "$BASEDIR/env/updated" -o $BASEDIR/requirements.txt -nt $BASEDIR/env/updated ]; then
+    pip3 install -r $BASEDIR/requirements.txt
+    touch $BASEDIR/env/updated
+    echo "Requirements installed."
+fi

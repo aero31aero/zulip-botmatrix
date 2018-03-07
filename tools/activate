@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+BASEDIR='.'
+
+$BASEDIR/tools/setup
+
+source $BASEDIR/env/bin/activate
