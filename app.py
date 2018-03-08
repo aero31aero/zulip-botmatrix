@@ -61,10 +61,13 @@ def apikey_check(view_function):
 	def decorated_function(*args, **kwargs):
 		if request.headers.get('key'):
 			g.user = None
-			user = User.query.filter_by(api_key=request.headers.get('key'))
-			if not user.count() == 1:
+			print(request.headers.get('key'))
+			users = User.query.filter_by(api_key=request.headers.get('key')) 
+			print(users)
+			if not users.count() == 1:
 				return abort(401)
-			g.user = user[0]
+			print(users[0])
+			g.user = users[0]
 			return view_function(*args, **kwargs)
 		else:
 			abort(401)
@@ -85,22 +88,19 @@ def token_getter():
 		return user.github_access_token
 
 @app.route("/")
-def hello():
-	return "Hello World! <a href='/login'>Click Here To Login</a>"
-
-@app.route('/upload', methods=['GET'])
-def get_upload_page():
+def index():
+	if g.user:
+		return '''
+		Welcome to BotMatrix <br>
+		Find your API key <a href='/user/key'>here</a>.
+		'''
 	return '''
-	<!doctype html>
-	<title>Upload new File</title>
-	<h1>Upload new File</h1>
-	<form method=post enctype=multipart/form-data>
-	  <p><input type=file name=file>
-		 <input type=submit value=Upload>
-	</form>
+	Welcome to BotMatrix <br>
+	You must login and then get your API key.<br>
+	<a href='/login'>Click Here To Login</a>
 	'''
 
-@app.route('/upload', methods=['POST'])
+@app.route('/bots/upload', methods=['POST'])
 @apikey_check
 def upload_file():
 	# check if the post request has the file part
@@ -108,8 +108,6 @@ def upload_file():
 		flash('No file part')
 		return redirect(request.url)
 	file = request.files['file']
-	# if user does not select file, browser also
-	# submit a empty part without filename
 	if file.filename == '':
 		flash('No selected file')
 		return redirect(request.url)
@@ -118,7 +116,7 @@ def upload_file():
 		username = secure_filename(github.get('user').get('login'))
 		filename = username + "-" + filename
 		file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-		return redirect(url_for('uploaded_file', filename=filename))
+		return "Bot uploaded successfully. Now you need to process it."
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
@@ -130,7 +128,7 @@ def generate_hash_key():
 @app.route('/login/callback')
 @github.authorized_handler
 def authorized(access_token):
-	next_url = request.args.get('next') or '/upload'
+	next_url = request.args.get('next') or '/'
 	if access_token is None:
 		return redirect(next_url)
 
