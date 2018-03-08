@@ -125,7 +125,7 @@ def uploaded_file(filename):
 	return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 def generate_hash_key():
-    return hashlib.sha256(str(random.getrandbits(256)).encode('utf-8')).hexdigest()
+	return hashlib.sha256(str(random.getrandbits(256)).encode('utf-8')).hexdigest()
 
 @app.route('/login/callback')
 @github.authorized_handler
@@ -165,6 +165,42 @@ def user():
 @app.route('/user/key')
 def user_api_key():
 	return g.user.api_key
+
+@app.route('/bots/process', methods=['POST'])
+@apikey_check
+def do_process_bot():
+	data = request.get_json(force=True)
+	if not data.get('name', False):
+		return "Specify a bot name."
+	username = secure_filename(github.get('user').get('login'))
+	bot_root = username + "-" + secure_filename(data.get('name'))
+	deployer.extract_file(bot_root)
+	if not deployer.check_and_load_structure(bot_root):
+		return "Failure. Something's wrong with your zip file."
+	deployer.create_docker_image(bot_root)
+	return "done"
+
+@app.route('/bots/start', methods=['POST'])
+@apikey_check
+def do_start_bot():
+	data = request.get_json(force=True)
+	if not data.get('name', False):
+		return "Specify a bot name."
+	username = secure_filename(github.get('user').get('login'))
+	bot_root = username + "-" + secure_filename(data.get('name'))
+	deployer.start_bot(bot_root)
+	return "done"
+
+@app.route('/bots/stop', methods=['POST'])
+@apikey_check
+def do_stop_bot():
+	data = request.get_json(force=True)
+	if not data.get('name', False):
+		return "Specify a bot name."
+	username = secure_filename(github.get('user').get('login'))
+	bot_root = username + "-" + secure_filename(data.get('name'))
+	deployer.stop_bot(bot_root)
+	return "done"
 
 if __name__ == '__main__':
 	init_db()
