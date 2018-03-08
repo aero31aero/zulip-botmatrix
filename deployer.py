@@ -10,8 +10,24 @@ import os
 from pathlib import Path
 import docker
 
-def initialize(bot_handler: Any) -> None:
-    docker_client = docker.from_env()
+provision = False
+docker_client = docker.from_env()
+
+def get_config(bot_root):
+    config_file = bot_root + '/config.ini'
+    if not Path(config_file).is_file:
+        print("No config file found")
+        return False
+    config = configparser.ConfigParser()
+    with open(config_file) as conf:
+        try:
+            config.readfp(conf)
+        except configparser.Error as e:
+            print("Error in config file")
+            display_config_file_errors(str(e), config_file)
+            return False
+    config = dict(config.items('deploy'))
+    return config
 
 def is_new_bot_message(message):
     msg = message['content']
@@ -37,27 +53,17 @@ def download_file(base_url):
     r = requests.get(file_url, allow_redirects=True)
     open('bots/' + file_name, 'wb').write(r.content)
 
-def extract_file():
+def extract_file(bot_root):
+    file_name = bot_root + ".zip"
     bot_zip = zipfile.ZipFile('bots/' + file_name)
     bot_name = file_name.split('.zip')[0]
     bot_root = 'bots/' + bot_name
     bot_zip.extractall(bot_root)
     bot_zip.close()
 
-def check_and_load_structure():
-    config_file = bot_root + '/config.ini'
-    if not Path(config_file).is_file:
-        print("No config file found")
-        return False
-    config = configparser.ConfigParser()
-    with open(config_file) as conf:
-        try:
-            config.readfp(conf)
-        except configparser.Error as e:
-            print("Error in config file")
-            display_config_file_errors(str(e), config_file)
-            return False
-    config = dict(config.items('deploy'))
+def check_and_load_structure(bot_root):
+    bot_root = "bots/" + bot_root
+    config = get_config(bot_root)
     bot_file = bot_root + '/' + config['bot']
     if not Path(bot_file).is_file:
         print("Bot main file not found")
@@ -72,11 +78,14 @@ def check_and_load_structure():
         provision = True
     return True
 
-def create_docker_image():
+def create_docker_image(bot_root):
+    bot_name = bot_root
+    bot_root = "bots/" + bot_root
+    config = get_config(bot_root)
     dockerfile = textwrap.dedent('''\
         FROM python:3
-        ADD ./* bot/
         RUN pip install zulip zulip-bots zulip-botserver
+        ADD ./* bot/
         ''')
     if provision == True:
         dockerfile += 'CMD [ "pip", "install", "-r", "bot/requirements.txt" ]\n'
@@ -84,13 +93,24 @@ def create_docker_image():
     with open(bot_root + '/Dockerfile', "w") as file:
         file.write(dockerfile)
 
-    bot_image = docker_client.images.build(path=bot_root, tag=bot_name.replace('@',''))
+    bot_image = docker_client.images.build(path=bot_root, tag=bot_name)
     print(bot_image)
 
 def start_bot(bot_name):
+    containers = docker_client.containers.list()
+    for container in containers:
+        for tag in container.image.tags:
+            if tag.startswith(bot_name.replace('@', '')):
+                # Bot already running
+                return False
     container = docker_client.containers.run(bot_name.replace('@', ''), detach=True)
     return True
 
-def start_bot(bot_name):
-    container = docker_client.containers.run(bot_name.replace('@', ''), detach=True)
-    return True
+def stop_bot(bot_name):
+    containers = docker_client.containers.list()
+    for container in containers:
+        for tag in container.image.tags:
+            if tag.startswith(bot_name.replace('@', '')):
+                container.stop()
+                return True
+    return False
