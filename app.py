@@ -5,25 +5,24 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
+from functools import wraps
+import base64
+import hashlib
+import random
 
-ALLOWED_EXTENSIONS = set(['zip', 'zbot'])
-UPLOAD_FOLDER = 'bots'
-
-DATABASE_URI = 'sqlite:////tmp/github-flask.db'
-SECRET_KEY = 'development key'
-DEBUG = True
-
-GITHUB_CLIENT_ID = 'c233f46559fe59d748e2'
-GITHUB_CLIENT_SECRET = 'c76d2178870fd509a2f01b433cb4c3789da40699'
+import dev_config as config
 
 app = Flask(__name__)
 app.config.from_object(__name__)
-github = GitHub(app)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
-app.config['GITHUB_CLIENT_ID'] = GITHUB_CLIENT_ID
-app.config['GITHUB_CLIENT_SECRET'] = GITHUB_CLIENT_SECRET
 
+app.config['UPLOAD_FOLDER'] = config.UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+app.config['GITHUB_CLIENT_ID'] = config.GITHUB_CLIENT_ID
+app.config['GITHUB_CLIENT_SECRET'] = config.GITHUB_CLIENT_SECRET
+app.config['DATABASE_URI'] = config.DATABASE_URI
+app.config['SECRET_KEY'] = config.SECRET_KEY
+app.config['DEBUG'] = config.DEBUG
+github = GitHub(app)
 engine = create_engine(app.config['DATABASE_URI'])
 db_session = scoped_session(sessionmaker(autocommit=False,
 										 autoflush=False,
@@ -41,18 +40,37 @@ class User(Base):
 	id = Column(Integer, primary_key=True)
 	username = Column(String(200))
 	github_access_token = Column(String(200))
+	api_key = Column(String(200))
 
 	def __init__(self, github_access_token):
 		self.github_access_token = github_access_token
 
 def allowed_file(name):
-	return '.' in name and name.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+	return '.' in name and name.rsplit('.', 1)[1].lower() in config.ALLOWED_EXTENSIONS
 
 @app.before_request
 def before_request():
 	g.user = None
 	if 'user_id' in session:
 		g.user = User.query.get(session['user_id'])
+
+# The Decorator for checking API Key
+def apikey_check(view_function):
+	@wraps(view_function)
+	def decorated_function(*args, **kwargs):
+		if request.headers.get('key'):
+			g.user = None
+			user = User.query.filter_by(api_key=request.headers.get('key'))
+			if not user.count() == 1:
+				return abort(401)
+			g.user = user[0]
+			return view_function(*args, **kwargs)
+		else:
+			abort(401)
+	return decorated_function
+
+import deployer
+import dev_config as config
 
 @app.after_request
 def after_request(response):
@@ -67,7 +85,7 @@ def token_getter():
 
 @app.route("/")
 def hello():
-	return "Hello World! <a href='/upload'>Click Here</a>"
+	return "Hello World! <a href='/login'>Click Here To Login</a>"
 
 @app.route('/upload', methods=['GET'])
 def get_upload_page():
@@ -82,6 +100,7 @@ def get_upload_page():
 	'''
 
 @app.route('/upload', methods=['POST'])
+@apikey_check
 def upload_file():
 	# check if the post request has the file part
 	if 'file' not in request.files:
@@ -95,12 +114,19 @@ def upload_file():
 		return redirect(request.url)
 	if file and allowed_file(file.filename):
 		filename = secure_filename(file.filename)
+		username = "anonymous"
+		if g.user:
+			username = secure_filename(github.get('user').get('login'))
+		filename = username + "-" + filename
 		file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 		return redirect(url_for('uploaded_file', filename=filename))
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
 	return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+def generate_hash_key():
+    return hashlib.sha256(str(random.getrandbits(256)).encode('utf-8')).hexdigest()
 
 @app.route('/login/callback')
 @github.authorized_handler
@@ -114,6 +140,8 @@ def authorized(access_token):
 		user = User(access_token)
 		db_session.add(user)
 	user.github_access_token = access_token
+	if not user.api_key:
+		user.api_key = generate_hash_key()
 	db_session.commit()
 
 	session['user_id'] = user.id
@@ -134,6 +162,10 @@ def logout():
 @app.route('/user')
 def user():
 	return str(github.get('user'))
+
+@app.route('/user/key')
+def user_api_key():
+	return g.user.api_key
 
 if __name__ == '__main__':
 	init_db()
