@@ -10,6 +10,7 @@ import base64
 import hashlib
 import random
 
+import deployer
 import dev_config as config
 
 app = Flask(__name__)
@@ -114,9 +115,7 @@ def upload_file():
 		return redirect(request.url)
 	if file and allowed_file(file.filename):
 		filename = secure_filename(file.filename)
-		username = "anonymous"
-		if g.user:
-			username = secure_filename(github.get('user').get('login'))
+		username = secure_filename(github.get('user').get('login'))
 		filename = username + "-" + filename
 		file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 		return redirect(url_for('uploaded_file', filename=filename))
