@@ -61,12 +61,9 @@ def apikey_check(view_function):
 	def decorated_function(*args, **kwargs):
 		if request.headers.get('key'):
 			g.user = None
-			print(request.headers.get('key'))
 			users = User.query.filter_by(api_key=request.headers.get('key')) 
-			print(users)
 			if not users.count() == 1:
 				return abort(401)
-			print(users[0])
 			g.user = users[0]
 			return view_function(*args, **kwargs)
 		else:
@@ -186,8 +183,9 @@ def do_start_bot():
 		return "Specify a bot name."
 	username = secure_filename(github.get('user').get('login'))
 	bot_root = username + "-" + secure_filename(data.get('name'))
-	deployer.start_bot(bot_root)
-	return "done"
+	if deployer.start_bot(bot_root):
+		return "done"
+	return "error"
 
 @app.route('/bots/stop', methods=['POST'])
 @apikey_check
