@@ -86,9 +86,8 @@ def create_docker_image(bot_root):
         FROM python:3
         RUN pip install zulip zulip-bots zulip-botserver
         ADD ./* bot/
+        RUN pip install -r bot/requirements.txt
         ''')
-    if provision == True:
-        dockerfile += 'CMD [ "pip", "install", "-r", "bot/requirements.txt" ]\n'
     dockerfile += 'CMD [ "zulip-run-bot", "bot/{bot}", "-c", "bot/{zuliprc}" ]\n'.format(bot=config['bot'], zuliprc=config['zuliprc'])
     with open(bot_root + '/Dockerfile', "w") as file:
         file.write(dockerfile)
