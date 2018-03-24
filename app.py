@@ -112,6 +112,7 @@ def upload_file():
 		filename = secure_filename(file.filename)
 		username = secure_filename(github.get('user').get('login'))
 		filename = username + "-" + filename
+		filename = filename.lower()
 		file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 		return "Bot uploaded successfully. Now you need to process it."
 
@@ -169,6 +170,7 @@ def do_process_bot():
 		return "Specify a bot name."
 	username = secure_filename(github.get('user').get('login'))
 	bot_root = username + "-" + secure_filename(data.get('name'))
+	bot_root = bot_root.lower()
 	deployer.extract_file(bot_root)
 	if not deployer.check_and_load_structure(bot_root):
 		return "Failure. Something's wrong with your zip file."
@@ -183,6 +185,7 @@ def do_start_bot():
 		return "Specify a bot name."
 	username = secure_filename(github.get('user').get('login'))
 	bot_root = username + "-" + secure_filename(data.get('name'))
+	bot_root = bot_root.lower()
 	if deployer.start_bot(bot_root):
 		return "done"
 	return "error"
@@ -195,6 +198,7 @@ def do_stop_bot():
 		return "Specify a bot name."
 	username = secure_filename(github.get('user').get('login'))
 	bot_root = username + "-" + secure_filename(data.get('name'))
+	bot_root = bot_root.lower()
 	deployer.stop_bot(bot_root)
 	return "done"
 
