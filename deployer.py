@@ -9,6 +9,7 @@ import configparser
 import os
 from pathlib import Path
 import docker
+from datetime import datetime
 
 provision = False
 docker_client = docker.from_env()
@@ -110,6 +111,12 @@ def stop_bot(bot_name):
     for container in containers:
         for tag in container.image.tags:
             if tag.startswith(bot_name.replace('@', '')):
+                logs = container.logs().decode("utf-8")
+                with open('bots/' + bot_name + '/logs.txt', 'a') as logfile:
+                    logfile.write("Container id: " + container.short_id + "\n")
+                    logfile.write("Stop Time: " + str(datetime.now()) + "\n")
+                    logfile.write(logs + "\n")
+                    logfile.write("--------------------\n")
                 container.stop()
                 return True
     return False
