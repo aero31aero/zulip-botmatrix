@@ -202,6 +202,19 @@ def do_stop_bot():
 	deployer.stop_bot(bot_root)
 	return "done"
 
+@app.route('/bots/logs/<botname>', methods=['GET'])
+@apikey_check
+def do_get_log(botname, **kwargs):
+	data = request.get_json(force=True)
+	lines = data.get('lines', None)
+	if not data.get('name', False):
+		return "Specify a bot name."
+	username = secure_filename(github.get('user').get('login'))
+	bot_root = username + "-" + secure_filename(data.get('name'))
+	bot_root = bot_root.lower()
+	logs = deployer.bot_log(bot_root, lines=lines)
+	return logs
+
 if __name__ == '__main__':
 	init_db()
 	app.run(debug=True)
