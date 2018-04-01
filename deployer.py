@@ -94,7 +94,6 @@ def create_docker_image(bot_root):
         file.write(dockerfile)
 
     bot_image = docker_client.images.build(path=bot_root, tag=bot_name)
-    print(bot_image)
 
 def start_bot(bot_name):
     containers = docker_client.containers.list()
@@ -120,3 +119,21 @@ def stop_bot(bot_name):
                 container.stop()
                 return True
     return False
+
+def bot_log(bot_name, **kwargs):
+    lines = kwargs.get('lines', None)
+    if lines is not None:
+        lines = int(lines)
+    containers = docker_client.containers.list(all=True)
+    for container in containers:
+        for tag in container.image.tags:
+            if tag.startswith(bot_name.replace('@', '')):
+                logs = container.logs().decode("utf-8")
+                if lines is None:
+                    return logs
+                else:
+                    logs = logs.split('\n')
+                    lines = max(0, len(logs)-lines)
+                    logs = '\n'.join(logs[lines:])
+                    return logs
+    return 'No logs found.'
