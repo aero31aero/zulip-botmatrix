@@ -133,6 +133,8 @@ def stop_bot(bot_name):
     return False
 
 def delete_bot(bot_name):
+    bot_containers = []
+    bot_image_ids = set()
     containers = docker_client.containers.list(all=True)
     for container in containers:
         for tag in container.image.tags:
@@ -141,10 +143,17 @@ def delete_bot(bot_name):
                     _stop_bot_container(bot_name, container)
                     # retrieve object for same container with updated status
                     container = docker_client.containers.get(container.id)
-                _delete_bot_container(container)
-                _delete_bot_files(bot_name)
-                return True
-    return False
+                bot_containers.append(container)
+                bot_image_ids.add(container.image.id)
+
+    for bot_container in bot_containers:
+        _delete_bot_container(bot_container)
+    
+    for bot_image_id in bot_image_ids:
+        _delete_bot_image(bot_image_id)
+    
+    _delete_bot_files(bot_name)
+    return True
 
 def _stop_bot_container(bot_name, container):
     logs = container.logs().decode("utf-8")
@@ -158,7 +167,9 @@ def _stop_bot_container(bot_name, container):
 def _delete_bot_container(container):
     container.remove(v=True, force=True)
     print("Bot container was removed.")
-    docker_client.images.remove(image=container.image.id, force=True)
+
+def _delete_bot_image(image_id):
+    docker_client.images.remove(image=image_id, force=True)
     print("Bot image was removed.")
 
 def _delete_bot_files(bot_name):
