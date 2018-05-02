@@ -110,18 +110,21 @@ def stop_bot(bot_name):
     for container in containers:
         for tag in container.image.tags:
             if tag.startswith(bot_name.replace('@', '')):
-                logs = container.logs().decode("utf-8")
-                with open('bots/' + bot_name + '/logs.txt', 'a') as logfile:
-                    logfile.write("Container id: " + container.short_id + "\n")
-                    logfile.write("Stop Time: " + str(datetime.now()) + "\n")
-                    logfile.write(logs + "\n")
-                    logfile.write("--------------------\n")
-                container.stop()
+                _stop_bot_container(bot_name, container)
                 return True
     return False
 
 def delete_bot(bot_name):
     return False
+
+def _stop_bot_container(bot_name, container):
+    logs = container.logs().decode("utf-8")
+    with open('bots/' + bot_name + '/logs.txt', 'a') as logfile:
+        logfile.write("Container id: " + container.short_id + "\n")
+        logfile.write("Stop Time: " + str(datetime.now()) + "\n")
+        logfile.write(logs + "\n")
+        logfile.write("--------------------\n")
+    container.stop()
 
 def bot_log(bot_name, **kwargs):
     lines = kwargs.get('lines', None)
