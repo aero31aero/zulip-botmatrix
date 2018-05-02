@@ -29,8 +29,7 @@ CONTAINER_STATUS_PRIORITY = {
 provision = False
 docker_client = docker.from_env()
 
-def get_config(bot_root):
-    config_file = bot_root + '/config.ini'
+def read_config_item(config_file, config_item):
     if not Path(config_file).is_file:
         print("No config file found")
         return False
@@ -42,8 +41,12 @@ def get_config(bot_root):
             print("Error in config file")
             display_config_file_errors(str(e), config_file)
             return False
-    config = dict(config.items('deploy'))
+    config = dict(config.items(config_item))
     return config
+
+def get_config(bot_root):
+    config_file = bot_root + '/config.ini'
+    return read_config_item(config_file, 'deploy')
 
 def is_new_bot_message(message):
     msg = message['content']
