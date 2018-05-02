@@ -215,6 +215,19 @@ def do_get_log(botname, **kwargs):
 	logs = deployer.bot_log(bot_root, lines=lines)
 	return logs
 
+@app.route('/bots/delete', methods=['POST'])
+@apikey_check
+def do_delete_bot():
+	data = request.get_json(force=True)
+	if not data.get('name', False):
+		return "Specify a bot name"
+	username = secure_filename(github.get('user').get('login'))
+	bot_root = username + "-" + secure_filename(data.get('name'))
+	bot_root = bot_root.lower()
+	if not deployer.delete_bot(bot_root):
+		return "error"
+	return "done"
+
 if __name__ == '__main__':
 	init_db()
 	app.run(debug=True)

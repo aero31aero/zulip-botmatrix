@@ -120,6 +120,9 @@ def stop_bot(bot_name):
                 return True
     return False
 
+def delete_bot(bot_name):
+    return False
+
 def bot_log(bot_name, **kwargs):
     lines = kwargs.get('lines', None)
     if lines is not None:
