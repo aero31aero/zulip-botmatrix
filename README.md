@@ -9,8 +9,8 @@ security risks of running untested code on the main server.
 1. Clone this repository and `cd` into it.
 2. `tools/activate` to install dependencies and activate virtualenv.
 3. Ensure that Docker is running and your current user can access it.
-4. `mkdir bots` for storing the bot data.
-5. `tools/run` to run the Flask server.
+   [Guide](https://askubuntu.com/questions/477551/how-can-i-use-docker-without-sudo).
+4. `tools/run` to run the Flask server.
 
 Now, you can either read the code and manually interface with it, or
 use the helper script with usage instructions: zulip/python-zulip-api#337
