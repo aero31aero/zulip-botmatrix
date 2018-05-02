@@ -176,3 +176,6 @@ def bot_log(bot_name, **kwargs):
                     logs = '\n'.join(logs[lines:])
                     return logs
     return 'No logs found.'
+
+def get_user_bots(username):
+    return {}

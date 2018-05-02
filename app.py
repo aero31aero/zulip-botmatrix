@@ -9,6 +9,7 @@ from functools import wraps
 import base64
 import hashlib
 import random
+import json
 
 import deployer
 import dev_config as config
@@ -227,6 +228,13 @@ def do_delete_bot():
 	if not deployer.delete_bot(bot_root):
 		return "error"
 	return "done"
+
+@app.route('/bots/list', methods=['GET'])
+@apikey_check
+def do_list_bots():
+	username = secure_filename(github.get('user').get('login'))
+	bots = deployer.get_user_bots(username)
+	return json.dumps(bots)
 
 if __name__ == '__main__':
 	init_db()
