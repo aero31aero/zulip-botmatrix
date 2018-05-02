@@ -7,6 +7,7 @@ import zipfile
 import textwrap
 import configparser
 import os
+import shutil
 from pathlib import Path
 import docker
 from datetime import datetime
@@ -110,15 +111,53 @@ def stop_bot(bot_name):
     for container in containers:
         for tag in container.image.tags:
             if tag.startswith(bot_name.replace('@', '')):
-                logs = container.logs().decode("utf-8")
-                with open('bots/' + bot_name + '/logs.txt', 'a') as logfile:
-                    logfile.write("Container id: " + container.short_id + "\n")
-                    logfile.write("Stop Time: " + str(datetime.now()) + "\n")
-                    logfile.write(logs + "\n")
-                    logfile.write("--------------------\n")
-                container.stop()
+                _stop_bot_container(bot_name, container)
                 return True
     return False
+
+def delete_bot(bot_name):
+    containers = docker_client.containers.list(all=True)
+    for container in containers:
+        for tag in container.image.tags:
+            if tag.startswith(bot_name.replace('@', '')):
+                if container.status == 'running':
+                    _stop_bot_container(bot_name, container)
+                    # retrieve object for same container with updated status
+                    container = docker_client.containers.get(container.id)
+                _delete_bot_container(container)
+                _delete_bot_files(bot_name)
+                return True
+    return False
+
+def _stop_bot_container(bot_name, container):
+    logs = container.logs().decode("utf-8")
+    with open('bots/' + bot_name + '/logs.txt', 'a') as logfile:
+        logfile.write("Container id: " + container.short_id + "\n")
+        logfile.write("Stop Time: " + str(datetime.now()) + "\n")
+        logfile.write(logs + "\n")
+        logfile.write("--------------------\n")
+    container.stop()
+
+def _delete_bot_container(container):
+    container.remove(v=True, force=True)
+    print("Bot container was removed.")
+    docker_client.images.remove(image=container.image.id, force=True)
+    print("Bot image was removed.")
+
+def _delete_bot_files(bot_name):
+    bot_root = 'bots/' + bot_name
+    if Path(bot_root).is_dir:
+        shutil.rmtree(bot_root)
+        print("Bot dir was removed.")
+    else:
+        print("Bot dir not found.")
+    
+    bot_zip_file = 'bots/' + bot_name + '.zip'
+    if Path(bot_zip_file).is_file:
+        os.remove(bot_zip_file)
+        print("Bot zip file was removed.")
+    else:
+        print("Bot zip file not found.")
 
 def bot_log(bot_name, **kwargs):
     lines = kwargs.get('lines', None)
