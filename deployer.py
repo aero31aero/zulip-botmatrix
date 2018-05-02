@@ -199,9 +199,15 @@ def get_user_bots(username):
     bot_name_prefix = username + '-'
     bot_status_by_name = _get_bot_statuses(bot_name_prefix)
     for bot_name, bot_status in bot_status_by_name.items():
+        bot_root = 'bots/' + bot_name
+        config = get_config(bot_root)
+        zuliprc_file = bot_root + '/' + config['zuliprc']
+        zuliprc = read_config_item(zuliprc_file, 'api')
         bot_info = dict(
             name=bot_name[len(bot_name_prefix):], # remove 'username-' prefix
-            status=bot_status
+            status=bot_status,
+            email=zuliprc['email'],
+            site=zuliprc['site'],
         )
         bots.append(bot_info)
     return bots
