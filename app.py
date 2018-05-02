@@ -234,7 +234,7 @@ def do_delete_bot():
 def do_list_bots():
 	username = secure_filename(github.get('user').get('login'))
 	bots = deployer.get_user_bots(username)
-	return json.dumps(bots)
+	return json.dumps(dict(bots=bots))
 
 if __name__ == '__main__':
 	init_db()

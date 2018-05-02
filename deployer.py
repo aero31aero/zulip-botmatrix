@@ -12,6 +12,20 @@ from pathlib import Path
 import docker
 from datetime import datetime
 
+CONTAINER_STATUS_LOW_PRIORITY = 0
+CONTAINER_STATUS_MEDIUM_PRIORITY = 1
+CONTAINER_STATUS_HIGH_PRIORITY = 2
+
+CONTAINER_STATUS_PRIORITY = {
+    'dead': CONTAINER_STATUS_LOW_PRIORITY,
+    'exited': CONTAINER_STATUS_LOW_PRIORITY,
+    'removing': CONTAINER_STATUS_MEDIUM_PRIORITY,
+    'paused': CONTAINER_STATUS_MEDIUM_PRIORITY,
+    'created': CONTAINER_STATUS_MEDIUM_PRIORITY,
+    'restarting': CONTAINER_STATUS_MEDIUM_PRIORITY,
+    'running': CONTAINER_STATUS_HIGH_PRIORITY,
+}
+
 provision = False
 docker_client = docker.from_env()
 
@@ -178,4 +192,28 @@ def bot_log(bot_name, **kwargs):
     return 'No logs found.'
 
 def get_user_bots(username):
-    return {}
+    bots = []
+    bot_name_prefix = username + '-'
+    bot_status_by_name = _get_bot_statuses(bot_name_prefix)
+    for bot_name, bot_status in bot_status_by_name.items():
+        bot_info = dict(
+            name=bot_name[len(bot_name_prefix):], # remove 'username-' prefix
+            status=bot_status
+        )
+        bots.append(bot_info)
+    return bots
+
+def _get_bot_statuses(bot_name_prefix):
+    bot_status_by_name = dict()
+    containers = docker_client.containers.list(all=True)
+    for container in containers:
+        for tag in container.image.tags:
+            if tag.startswith(bot_name_prefix):
+                bot_name = tag[:tag.find(':')]
+                bot_status = container.status
+                if bot_name in bot_status_by_name:
+                    if bot_status > bot_status_by_name[bot_name]:
+                        bot_status_by_name[bot_name] = bot_status
+                else:
+                    bot_status_by_name[bot_name] = bot_status
+    return bot_status_by_name
