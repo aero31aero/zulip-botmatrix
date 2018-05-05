@@ -4,3 +4,5 @@ Flask-SQLAlchemy
 Werkzeug
 requests
 docker
+coverage>=4.4.1
+mock
