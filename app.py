@@ -14,7 +14,7 @@ import json
 import deployer
 import dev_config as config
 
-from naming import normalize_username
+from naming import normalize_username, get_bot_filename
 
 app = Flask(__name__)
 app.config.from_object(__name__)
@@ -112,11 +112,9 @@ def upload_file():
 		flash('No selected file')
 		return redirect(request.url)
 	if file and allowed_file(file.filename):
-		filename = secure_filename(file.filename)
-		username = normalize_username(github.get('user').get('login'))
-		filename = username + "-" + filename
-		filename = filename.lower()
-		file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+		username = github.get('user').get('login')
+		bot_filename = get_bot_filename(username, file.filename)
+		file.save(os.path.join(app.config['UPLOAD_FOLDER'], bot_filename))
 		return success_response(message="Bot uploaded successfully. Now you need to process it.")
 
 @app.route('/uploads/<filename>')
