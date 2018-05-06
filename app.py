@@ -169,10 +169,10 @@ def do_process_bot():
 	data = request.get_json(force=True)
 	if not data.get('name', False):
 		return error_response("Specify a bot name.")
-	username = normalize_username(github.get('user').get('login'))
-	bot_root = username + "-" + secure_filename(data.get('name'))
-	bot_root = bot_root.lower()
-	deployer.extract_file(bot_root)
+	username = github.get('user').get('login')
+	bot_zip_name = get_bot_filename(username, data.get('name') + '.zip')
+	bot_zip_path = os.path.join(app.config['UPLOAD_FOLDER'], bot_zip_name)
+	bot_root = deployer.extract_file(bot_zip_path)
 	if not deployer.check_and_load_structure(bot_root):
 		return error_response("Failure. Something's wrong with your zip file.")
 	deployer.create_docker_image(bot_root)

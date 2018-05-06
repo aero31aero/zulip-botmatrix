@@ -72,34 +72,29 @@ def download_file(base_url):
     r = requests.get(file_url, allow_redirects=True)
     open('bots/' + file_name, 'wb').write(r.content)
 
-def extract_file(bot_root):
-    file_name = bot_root + ".zip"
-    bot_zip = zipfile.ZipFile('bots/' + file_name)
-    bot_name = file_name.split('.zip')[0]
-    bot_root = 'bots/' + bot_name
+def extract_file(bot_zip_path):
+    bot_zip = zipfile.ZipFile(bot_zip_path)
+    bot_root = os.path.splitext(bot_zip_path)[0]
     bot_zip.extractall(bot_root)
     bot_zip.close()
+    return bot_root
 
 def check_and_load_structure(bot_root):
-    bot_root = "bots/" + bot_root
     config = get_config(bot_root)
-    bot_file = bot_root + '/' + config['bot']
-    if not Path(bot_file).is_file:
+    bot_main_file = os.path.join(bot_root, config['bot'])
+    if not Path(bot_main_file).is_file:
         print("Bot main file not found")
         return False
-    zuliprc_file = bot_root + '/' + config['zuliprc']
+    zuliprc_file = os.path.join(bot_root, config['zuliprc'])
     if not Path(zuliprc_file).is_file:
         print("Zuliprc file not found")
         return False
-    provision = False
-    if Path(bot_root + '/requirements.txt').is_file:
-        "Found a requirements file"
-        provision = True
+    if Path(os.path.join(bot_root, 'requirements.txt')).is_file:
+        print("Found a requirements file")
     return True
 
 def create_docker_image(bot_root):
-    bot_name = bot_root
-    bot_root = "bots/" + bot_root
+    bot_name = os.path.basename(bot_root)
     config = get_config(bot_root)
     dockerfile = textwrap.dedent('''\
         FROM python:3
@@ -108,7 +103,7 @@ def create_docker_image(bot_root):
         RUN pip install -r bot/requirements.txt
         ''')
     dockerfile += 'CMD [ "zulip-run-bot", "bot/{bot}", "-c", "bot/{zuliprc}" ]\n'.format(bot=config['bot'], zuliprc=config['zuliprc'])
-    with open(bot_root + '/Dockerfile', "w") as file:
+    with open(os.path.join(bot_root, 'Dockerfile'), "w") as file:
         file.write(dockerfile)
 
     _delete_bot_images(bot_name)
