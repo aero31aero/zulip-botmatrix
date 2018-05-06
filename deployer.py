@@ -11,7 +11,8 @@ import shutil
 from pathlib import Path
 import docker
 from datetime import datetime
-from naming import get_bot_image_name
+from naming import get_bot_image_name, get_bot_name, \
+    extract_bot_name_from_image
 
 CONTAINER_STATUS_LOW_PRIORITY = 0
 CONTAINER_STATUS_MEDIUM_PRIORITY = 1
@@ -212,7 +213,7 @@ def bot_log(bot_name, **kwargs):
 
 def get_user_bots(username):
     bots = []
-    bot_name_prefix = username + '-'
+    bot_name_prefix = get_bot_name(username, '')
     bot_status_by_name = _get_bot_statuses(bot_name_prefix)
     for bot_name, bot_status in bot_status_by_name.items():
         bot_root = 'bots/' + bot_name
@@ -230,11 +231,13 @@ def get_user_bots(username):
 
 def _get_bot_statuses(bot_name_prefix):
     bot_status_by_name = dict()
+    bot_image_name_prefix = get_bot_image_name(bot_name_prefix)
     containers = docker_client.containers.list(all=True)
     for container in containers:
         for tag in container.image.tags:
-            if tag.startswith(bot_name_prefix):
-                bot_name = tag[:tag.find(':')]
+            if tag.startswith(bot_image_name_prefix):
+                bot_image_name = tag[:tag.find(':')]
+                bot_name = extract_bot_name_from_image(bot_image_name)
                 bot_status = container.status
                 if bot_name in bot_status_by_name:
                     if bot_status > bot_status_by_name[bot_name]:
