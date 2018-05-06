@@ -207,10 +207,9 @@ def do_get_log(botname, **kwargs):
 	lines = data.get('lines', None)
 	if not data.get('name', False):
 		return error_response("Specify a bot name.")
-	username = normalize_username(github.get('user').get('login'))
-	bot_root = username + "-" + secure_filename(data.get('name'))
-	bot_root = bot_root.lower()
-	logs = deployer.bot_log(bot_root, lines=lines)
+	username = github.get('user').get('login')
+	bot_name = get_bot_name(username, data.get('name'))
+	logs = deployer.bot_log(bot_name, lines=lines)
 	return success_response(logs=dict(content=logs))
 
 @app.route('/bots/delete', methods=['POST'])

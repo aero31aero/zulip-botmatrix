@@ -194,10 +194,11 @@ def bot_log(bot_name, **kwargs):
     lines = kwargs.get('lines', None)
     if lines is not None:
         lines = int(lines)
+    bot_image_name = get_bot_image_name(bot_name)
     containers = docker_client.containers.list(all=True)
     for container in containers:
         for tag in container.image.tags:
-            if tag.startswith(bot_name.replace('@', '')):
+            if tag.startswith(bot_image_name):
                 logs = container.logs().decode("utf-8")
                 if lines is None:
                     return logs
