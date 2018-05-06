@@ -139,10 +139,11 @@ def delete_bot(bot_name):
 def _delete_bot_images(bot_name):
     bot_containers = []
     bot_image_ids = set()
+    bot_image_name = get_bot_image_name(bot_name)
     containers = docker_client.containers.list(all=True)
     for container in containers:
         for tag in container.image.tags:
-            if tag.startswith(bot_name.replace('@', '')):
+            if tag.startswith(bot_image_name):
                 if container.status == 'running':
                     _stop_bot_container(bot_name, container)
                     # retrieve object for same container with updated status
