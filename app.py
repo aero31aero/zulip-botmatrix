@@ -14,7 +14,7 @@ import json
 import deployer
 import dev_config as config
 
-from naming import normalize_username, get_bot_filename
+from naming import normalize_username, get_bot_filename, get_bot_name
 
 app = Flask(__name__)
 app.config.from_object(__name__)
@@ -184,10 +184,9 @@ def do_start_bot():
 	data = request.get_json(force=True)
 	if not data.get('name', False):
 		return error_response("Specify a bot name.")
-	username = normalize_username(github.get('user').get('login'))
-	bot_root = username + "-" + secure_filename(data.get('name'))
-	bot_root = bot_root.lower()
-	if deployer.start_bot(bot_root):
+	username = github.get('user').get('login')
+	bot_name = get_bot_name(username, data.get('name'))
+	if deployer.start_bot(bot_name):
 		return success_response()
 	return error_response()
 

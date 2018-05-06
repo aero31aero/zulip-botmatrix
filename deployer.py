@@ -11,6 +11,7 @@ import shutil
 from pathlib import Path
 import docker
 from datetime import datetime
+from naming import get_bot_image_name
 
 CONTAINER_STATUS_LOW_PRIORITY = 0
 CONTAINER_STATUS_MEDIUM_PRIORITY = 1
@@ -110,13 +111,14 @@ def create_docker_image(bot_root):
     bot_image = docker_client.images.build(path=bot_root, tag=bot_name)
 
 def start_bot(bot_name):
+    bot_image_name = get_bot_image_name(bot_name)
     containers = docker_client.containers.list()
     for container in containers:
         for tag in container.image.tags:
-            if tag.startswith(bot_name.replace('@', '')):
+            if tag.startswith(bot_image_name):
                 # Bot already running
                 return False
-    container = docker_client.containers.run(bot_name.replace('@', ''), detach=True)
+    container = docker_client.containers.run(bot_image_name, detach=True)
     return True
 
 def stop_bot(bot_name):
