@@ -122,10 +122,11 @@ def start_bot(bot_name):
     return True
 
 def stop_bot(bot_name):
+    bot_image_name = get_bot_image_name(bot_name)
     containers = docker_client.containers.list()
     for container in containers:
         for tag in container.image.tags:
-            if tag.startswith(bot_name.replace('@', '')):
+            if tag.startswith(bot_image_name):
                 _stop_bot_container(bot_name, container)
                 return True
     return False
@@ -158,7 +159,8 @@ def _delete_bot_images(bot_name):
 
 def _stop_bot_container(bot_name, container):
     logs = container.logs().decode("utf-8")
-    with open('bots/' + bot_name + '/logs.txt', 'a') as logfile:
+    bot_logs_path = os.path.join('bots', bot_name, 'logs.txt')
+    with open(bot_logs_path, 'a') as logfile:
         logfile.write("Container id: " + container.short_id + "\n")
         logfile.write("Stop Time: " + str(datetime.now()) + "\n")
         logfile.write(logs + "\n")

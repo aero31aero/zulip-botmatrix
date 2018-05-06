@@ -196,10 +196,8 @@ def do_stop_bot():
 	data = request.get_json(force=True)
 	if not data.get('name', False):
 		return error_response("Specify a bot name.")
-	username = normalize_username(github.get('user').get('login'))
-	bot_root = username + "-" + secure_filename(data.get('name'))
-	bot_root = bot_root.lower()
-	deployer.stop_bot(bot_root)
+	bot_name = get_bot_name(github.get('user').get('login'), data.get('name')) 
+	deployer.stop_bot(bot_name)
 	return success_response()
 
 @app.route('/bots/logs/<botname>', methods=['GET'])
