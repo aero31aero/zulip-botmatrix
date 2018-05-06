@@ -115,7 +115,7 @@ def upload_file():
 		filename = username + "-" + filename
 		filename = filename.lower()
 		file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-		return "Bot uploaded successfully. Now you need to process it."
+		return success_response(message="Bot uploaded successfully. Now you need to process it.")
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
@@ -168,40 +168,40 @@ def user_api_key():
 def do_process_bot():
 	data = request.get_json(force=True)
 	if not data.get('name', False):
-		return "Specify a bot name."
+		return error_response("Specify a bot name.")
 	username = secure_filename(github.get('user').get('login'))
 	bot_root = username + "-" + secure_filename(data.get('name'))
 	bot_root = bot_root.lower()
 	deployer.extract_file(bot_root)
 	if not deployer.check_and_load_structure(bot_root):
-		return "Failure. Something's wrong with your zip file."
+		return error_response("Failure. Something's wrong with your zip file.")
 	deployer.create_docker_image(bot_root)
-	return "done"
+	return success_response()
 
 @app.route('/bots/start', methods=['POST'])
 @apikey_check
 def do_start_bot():
 	data = request.get_json(force=True)
 	if not data.get('name', False):
-		return "Specify a bot name."
+		return error_response("Specify a bot name.")
 	username = secure_filename(github.get('user').get('login'))
 	bot_root = username + "-" + secure_filename(data.get('name'))
 	bot_root = bot_root.lower()
 	if deployer.start_bot(bot_root):
-		return "done"
-	return "error"
+		return success_response()
+	return error_response()
 
 @app.route('/bots/stop', methods=['POST'])
 @apikey_check
 def do_stop_bot():
 	data = request.get_json(force=True)
 	if not data.get('name', False):
-		return "Specify a bot name."
+		return error_response("Specify a bot name.")
 	username = secure_filename(github.get('user').get('login'))
 	bot_root = username + "-" + secure_filename(data.get('name'))
 	bot_root = bot_root.lower()
 	deployer.stop_bot(bot_root)
-	return "done"
+	return success_response()
 
 @app.route('/bots/logs/<botname>', methods=['GET'])
 @apikey_check
@@ -209,32 +209,38 @@ def do_get_log(botname, **kwargs):
 	data = request.get_json(force=True)
 	lines = data.get('lines', None)
 	if not data.get('name', False):
-		return "Specify a bot name."
+		return error_response("Specify a bot name.")
 	username = secure_filename(github.get('user').get('login'))
 	bot_root = username + "-" + secure_filename(data.get('name'))
 	bot_root = bot_root.lower()
 	logs = deployer.bot_log(bot_root, lines=lines)
-	return logs
+	return success_response(logs=dict(content=logs))
 
 @app.route('/bots/delete', methods=['POST'])
 @apikey_check
 def do_delete_bot():
 	data = request.get_json(force=True)
 	if not data.get('name', False):
-		return "Specify a bot name"
+		return error_response("Specify a bot name")
 	username = secure_filename(github.get('user').get('login'))
 	bot_root = username + "-" + secure_filename(data.get('name'))
 	bot_root = bot_root.lower()
 	if not deployer.delete_bot(bot_root):
-		return "error"
-	return "done"
+		return error_response()
+	return success_response()
 
 @app.route('/bots/list', methods=['GET'])
 @apikey_check
 def do_list_bots():
 	username = secure_filename(github.get('user').get('login'))
 	bots = deployer.get_user_bots(username)
-	return json.dumps(dict(bots=bots))
+	return success_response(bots=dict(list=bots))
+
+def success_response(message='', **payload):
+	return json.dumps(dict(status="success", message=message, **payload))
+
+def error_response(message=''):
+	return json.dumps(dict(status="error", message=message))
 
 if __name__ == '__main__':
 	init_db()
