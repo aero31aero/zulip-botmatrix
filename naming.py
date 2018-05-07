@@ -11,9 +11,6 @@ def normalize_filename(filename: str) -> str:
 def normalize_bot_name(bot_name: str) -> str:
     return secure_filename(bot_name).lower()
 
-def get_bot_filename(username: str, filename: str) -> str:
-    return '{}-{}'.format(normalize_username(username), normalize_filename(filename))
-
 def get_bot_name(username: str, name: str) -> str:
     return '{}-{}'.format(normalize_username(username), normalize_bot_name(name))
 

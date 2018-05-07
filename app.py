@@ -14,12 +14,11 @@ import json
 import deployer
 import dev_config as config
 
-from naming import normalize_username, get_bot_filename, get_bot_name
+from naming import normalize_username, get_bot_name
 
 app = Flask(__name__)
 app.config.from_object(__name__)
 
-app.config['UPLOAD_FOLDER'] = config.UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 app.config['GITHUB_CLIENT_ID'] = config.GITHUB_CLIENT_ID
 app.config['GITHUB_CLIENT_SECRET'] = config.GITHUB_CLIENT_SECRET
@@ -50,7 +49,7 @@ class User(Base):
 		self.github_access_token = github_access_token
 
 def allowed_file(name):
-	return '.' in name and name.rsplit('.', 1)[1].lower() in config.ALLOWED_EXTENSIONS
+	return os.path.splitext(name)[1] in config.ALLOWED_EXTENSIONS
 
 @app.before_request
 def before_request():
@@ -113,13 +112,15 @@ def upload_file():
 		return redirect(request.url)
 	if file and allowed_file(file.filename):
 		username = github.get('user').get('login')
-		bot_filename = get_bot_filename(username, file.filename)
-		file.save(os.path.join(app.config['UPLOAD_FOLDER'], bot_filename))
+		name, file_ext = os.path.splitext(file.filename)
+		bot_name = get_bot_name(username, name)
+		bot_filename = bot_name + file_ext
+		file.save(os.path.join(deployer.get_bots_dir(), bot_filename))
 		return success_response(message="Bot uploaded successfully. Now you need to process it.")
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
-	return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+	return send_from_directory(deployer.get_bots_dir(), filename)
 
 def generate_hash_key():
 	return hashlib.sha256(str(random.getrandbits(256)).encode('utf-8')).hexdigest()
@@ -170,12 +171,13 @@ def do_process_bot():
 	if not data.get('name', False):
 		return error_response("Specify a bot name.")
 	username = github.get('user').get('login')
-	bot_zip_name = get_bot_filename(username, data.get('name') + '.zip')
-	bot_zip_path = os.path.join(app.config['UPLOAD_FOLDER'], bot_zip_name)
-	bot_root = deployer.extract_file(bot_zip_path)
-	if not deployer.check_and_load_structure(bot_root):
+	bot_name = get_bot_name(username, data.get('name'))
+	extracted = deployer.extract_file(bot_name)
+	if not extracted:
+		return error_response("Failure. Bot zip file not found.")
+	if not deployer.check_and_load_structure(bot_name):
 		return error_response("Failure. Something's wrong with your zip file.")
-	deployer.create_docker_image(bot_root)
+	deployer.create_docker_image(bot_name)
 	return success_response()
 
 @app.route('/bots/start', methods=['POST'])
