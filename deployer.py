@@ -13,6 +13,9 @@ import docker
 from datetime import datetime
 from naming import get_bot_image_name, get_bot_name, \
     extract_bot_name_from_image
+import dev_config as config
+
+BOTS_DIR = config.UPLOAD_FOLDER
 
 CONTAINER_STATUS_LOW_PRIORITY = 0
 CONTAINER_STATUS_MEDIUM_PRIORITY = 1
@@ -50,6 +53,21 @@ def get_config(bot_root):
     config_file = bot_root + '/config.ini'
     return read_config_item(config_file, 'deploy')
 
+def get_bots_dir():
+    return BOTS_DIR
+
+def get_bot_root(bot_name):
+    return os.path.join(BOTS_DIR, bot_name)
+
+def find_bot_file(bot_name):
+	for filename in os.listdir(BOTS_DIR):
+		filepath = os.path.join(BOTS_DIR, filename)
+		if os.path.isfile(filepath):
+			name, ext = os.path.splitext(filename)
+			if name == bot_name and ext in config.ALLOWED_EXTENSIONS:
+				return filepath
+	return None
+
 def is_new_bot_message(message):
     msg = message['content']
     name = msg[msg.find("[")+1:msg.rfind("]")]
@@ -74,14 +92,18 @@ def download_file(base_url):
     r = requests.get(file_url, allow_redirects=True)
     open('bots/' + file_name, 'wb').write(r.content)
 
-def extract_file(bot_zip_path):
+def extract_file(bot_name):
+    bot_zip_path = find_bot_file(bot_name)
+    if bot_zip_path is None:
+        return False
     bot_zip = zipfile.ZipFile(bot_zip_path)
-    bot_root = os.path.splitext(bot_zip_path)[0]
+    bot_root = get_bot_root(bot_name)
     bot_zip.extractall(bot_root)
     bot_zip.close()
-    return bot_root
+    return True
 
-def check_and_load_structure(bot_root):
+def check_and_load_structure(bot_name):
+    bot_root = get_bot_root(bot_name)
     config = get_config(bot_root)
     bot_main_file = os.path.join(bot_root, config['bot'])
     if not Path(bot_main_file).is_file:
@@ -95,8 +117,8 @@ def check_and_load_structure(bot_root):
         print("Found a requirements file")
     return True
 
-def create_docker_image(bot_root):
-    bot_name = os.path.basename(bot_root)
+def create_docker_image(bot_name):
+    bot_root = get_bot_root(bot_name)
     config = get_config(bot_root)
     dockerfile = textwrap.dedent('''\
         FROM python:3
@@ -107,9 +129,9 @@ def create_docker_image(bot_root):
     dockerfile += 'CMD [ "zulip-run-bot", "bot/{bot}", "-c", "bot/{zuliprc}" ]\n'.format(bot=config['bot'], zuliprc=config['zuliprc'])
     with open(os.path.join(bot_root, 'Dockerfile'), "w") as file:
         file.write(dockerfile)
-
     _delete_bot_images(bot_name)
-    bot_image = docker_client.images.build(path=bot_root, tag=bot_name)
+    bot_image_name = get_bot_image_name(bot_name)
+    bot_image = docker_client.images.build(path=bot_root, tag=bot_image_name)
 
 def start_bot(bot_name):
     bot_image_name = get_bot_image_name(bot_name)
@@ -161,7 +183,7 @@ def _delete_bot_images(bot_name):
 
 def _stop_bot_container(bot_name, container):
     logs = container.logs().decode("utf-8")
-    bot_logs_path = os.path.join('bots', bot_name, 'logs.txt')
+    bot_logs_path = os.path.join(get_bot_root(bot_name), 'logs.txt')
     with open(bot_logs_path, 'a') as logfile:
         logfile.write("Container id: " + container.short_id + "\n")
         logfile.write("Stop Time: " + str(datetime.now()) + "\n")
@@ -178,15 +200,15 @@ def _delete_bot_image(image_id):
     print("Bot image was removed.")
 
 def _delete_bot_files(bot_name):
-    bot_root = 'bots/' + bot_name
+    bot_root = get_bot_root(bot_name)
     if Path(bot_root).is_dir:
         shutil.rmtree(bot_root)
         print("Bot dir was removed.")
     else:
         print("Bot dir not found.")
     
-    bot_zip_file = 'bots/' + bot_name + '.zip'
-    if Path(bot_zip_file).is_file:
+    bot_zip_file = find_bot_file(bot_name)
+    if bot_zip_file is not None:
         os.remove(bot_zip_file)
         print("Bot zip file was removed.")
     else:
@@ -216,9 +238,9 @@ def get_user_bots(username):
     bot_name_prefix = get_bot_name(username, '')
     bot_status_by_name = _get_bot_statuses(bot_name_prefix)
     for bot_name, bot_status in bot_status_by_name.items():
-        bot_root = 'bots/' + bot_name
+        bot_root = get_bot_root(bot_name)
         config = get_config(bot_root)
-        zuliprc_file = bot_root + '/' + config['zuliprc']
+        zuliprc_file = os.path.join(bot_root, config['zuliprc'])
         zuliprc = read_config_item(zuliprc_file, 'api')
         bot_info = dict(
             name=bot_name[len(bot_name_prefix):], # remove 'username-' prefix

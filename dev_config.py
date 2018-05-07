@@ -1,5 +1,5 @@
 import os
-ALLOWED_EXTENSIONS = set(['zip', 'zbot'])
+ALLOWED_EXTENSIONS = set(['.zip', '.zbot'])
 UPLOAD_FOLDER = 'bots'
 
 DATABASE_URI = 'sqlite:////tmp/github-flask.db'
