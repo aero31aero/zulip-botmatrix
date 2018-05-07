@@ -111,6 +111,7 @@ def create_docker_image(bot_root):
     with open(bot_root + '/Dockerfile', "w") as file:
         file.write(dockerfile)
 
+    _delete_bot_images(bot_name)
     bot_image = docker_client.images.build(path=bot_root, tag=bot_name)
 
 def start_bot(bot_name):
