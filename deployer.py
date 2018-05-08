@@ -111,6 +111,7 @@ def create_docker_image(bot_root):
     with open(bot_root + '/Dockerfile', "w") as file:
         file.write(dockerfile)
 
+    _delete_bot_images(bot_name)
     bot_image = docker_client.images.build(path=bot_root, tag=bot_name)
 
 def start_bot(bot_name):
@@ -133,6 +134,11 @@ def stop_bot(bot_name):
     return False
 
 def delete_bot(bot_name):
+    _delete_bot_images(bot_name)
+    _delete_bot_files(bot_name)
+    return True
+
+def _delete_bot_images(bot_name):
     bot_containers = []
     bot_image_ids = set()
     containers = docker_client.containers.list(all=True)
@@ -151,9 +157,7 @@ def delete_bot(bot_name):
     
     for bot_image_id in bot_image_ids:
         _delete_bot_image(bot_image_id)
-    
-    _delete_bot_files(bot_name)
-    return True
+
 
 def _stop_bot_container(bot_name, container):
     logs = container.logs().decode("utf-8")
