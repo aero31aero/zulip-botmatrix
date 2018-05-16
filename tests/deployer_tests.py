@@ -14,7 +14,7 @@ class DeployerTest(TestCase):
                 dict(id='c1', image_id='i1', status='created')
             ],
             images=[
-                dict(id='i1', tags=['user1-bot_1:latest'])
+                dict(id='i1', tags=['zulip-user1-bot_1:latest'])
             ]
         )
         with patch('deployer.docker_client', new=docker_client):
@@ -27,7 +27,7 @@ class DeployerTest(TestCase):
                 dict(id='c1', image_id='i1', status='running')
             ],
             images=[
-                dict(id='i1', tags=['user1-bot_1:latest'])
+                dict(id='i1', tags=['zulip-user1-bot_1:latest'])
             ]
         )
         with patch('deployer.docker_client', new=docker_client):
