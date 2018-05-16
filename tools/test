@@ -1,0 +1,7 @@
+#! /usr/bin/env bash
+
+BASEDIR=`dirname $0`/..
+source $BASEDIR/tools/activate
+
+# Run the tests one by one
+$BASEDIR/tools/test-deployer
