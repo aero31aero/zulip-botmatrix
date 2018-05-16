@@ -11,6 +11,8 @@ import shutil
 from pathlib import Path
 import docker
 from datetime import datetime
+from naming import get_bot_image_name, get_bot_name, \
+    extract_bot_name_from_image
 
 CONTAINER_STATUS_LOW_PRIORITY = 0
 CONTAINER_STATUS_MEDIUM_PRIORITY = 1
@@ -72,34 +74,29 @@ def download_file(base_url):
     r = requests.get(file_url, allow_redirects=True)
     open('bots/' + file_name, 'wb').write(r.content)
 
-def extract_file(bot_root):
-    file_name = bot_root + ".zip"
-    bot_zip = zipfile.ZipFile('bots/' + file_name)
-    bot_name = file_name.split('.zip')[0]
-    bot_root = 'bots/' + bot_name
+def extract_file(bot_zip_path):
+    bot_zip = zipfile.ZipFile(bot_zip_path)
+    bot_root = os.path.splitext(bot_zip_path)[0]
     bot_zip.extractall(bot_root)
     bot_zip.close()
+    return bot_root
 
 def check_and_load_structure(bot_root):
-    bot_root = "bots/" + bot_root
     config = get_config(bot_root)
-    bot_file = bot_root + '/' + config['bot']
-    if not Path(bot_file).is_file:
+    bot_main_file = os.path.join(bot_root, config['bot'])
+    if not Path(bot_main_file).is_file:
         print("Bot main file not found")
         return False
-    zuliprc_file = bot_root + '/' + config['zuliprc']
+    zuliprc_file = os.path.join(bot_root, config['zuliprc'])
     if not Path(zuliprc_file).is_file:
         print("Zuliprc file not found")
         return False
-    provision = False
-    if Path(bot_root + '/requirements.txt').is_file:
-        "Found a requirements file"
-        provision = True
+    if Path(os.path.join(bot_root, 'requirements.txt')).is_file:
+        print("Found a requirements file")
     return True
 
 def create_docker_image(bot_root):
-    bot_name = bot_root
-    bot_root = "bots/" + bot_root
+    bot_name = os.path.basename(bot_root)
     config = get_config(bot_root)
     dockerfile = textwrap.dedent('''\
         FROM python:3
@@ -108,27 +105,29 @@ def create_docker_image(bot_root):
         RUN pip install -r bot/requirements.txt
         ''')
     dockerfile += 'CMD [ "zulip-run-bot", "bot/{bot}", "-c", "bot/{zuliprc}" ]\n'.format(bot=config['bot'], zuliprc=config['zuliprc'])
-    with open(bot_root + '/Dockerfile', "w") as file:
+    with open(os.path.join(bot_root, 'Dockerfile'), "w") as file:
         file.write(dockerfile)
 
     _delete_bot_images(bot_name)
     bot_image = docker_client.images.build(path=bot_root, tag=bot_name)
 
 def start_bot(bot_name):
+    bot_image_name = get_bot_image_name(bot_name)
     containers = docker_client.containers.list()
     for container in containers:
         for tag in container.image.tags:
-            if tag.startswith(bot_name.replace('@', '')):
+            if tag.startswith(bot_image_name):
                 # Bot already running
                 return False
-    container = docker_client.containers.run(bot_name.replace('@', ''), detach=True)
+    container = docker_client.containers.run(bot_image_name, detach=True)
     return True
 
 def stop_bot(bot_name):
+    bot_image_name = get_bot_image_name(bot_name)
     containers = docker_client.containers.list()
     for container in containers:
         for tag in container.image.tags:
-            if tag.startswith(bot_name.replace('@', '')):
+            if tag.startswith(bot_image_name):
                 _stop_bot_container(bot_name, container)
                 return True
     return False
@@ -141,10 +140,11 @@ def delete_bot(bot_name):
 def _delete_bot_images(bot_name):
     bot_containers = []
     bot_image_ids = set()
+    bot_image_name = get_bot_image_name(bot_name)
     containers = docker_client.containers.list(all=True)
     for container in containers:
         for tag in container.image.tags:
-            if tag.startswith(bot_name.replace('@', '')):
+            if tag.startswith(bot_image_name):
                 if container.status == 'running':
                     _stop_bot_container(bot_name, container)
                     # retrieve object for same container with updated status
@@ -161,7 +161,8 @@ def _delete_bot_images(bot_name):
 
 def _stop_bot_container(bot_name, container):
     logs = container.logs().decode("utf-8")
-    with open('bots/' + bot_name + '/logs.txt', 'a') as logfile:
+    bot_logs_path = os.path.join('bots', bot_name, 'logs.txt')
+    with open(bot_logs_path, 'a') as logfile:
         logfile.write("Container id: " + container.short_id + "\n")
         logfile.write("Stop Time: " + str(datetime.now()) + "\n")
         logfile.write(logs + "\n")
@@ -195,10 +196,11 @@ def bot_log(bot_name, **kwargs):
     lines = kwargs.get('lines', None)
     if lines is not None:
         lines = int(lines)
+    bot_image_name = get_bot_image_name(bot_name)
     containers = docker_client.containers.list(all=True)
     for container in containers:
         for tag in container.image.tags:
-            if tag.startswith(bot_name.replace('@', '')):
+            if tag.startswith(bot_image_name):
                 logs = container.logs().decode("utf-8")
                 if lines is None:
                     return logs
@@ -211,7 +213,7 @@ def bot_log(bot_name, **kwargs):
 
 def get_user_bots(username):
     bots = []
-    bot_name_prefix = username + '-'
+    bot_name_prefix = get_bot_name(username, '')
     bot_status_by_name = _get_bot_statuses(bot_name_prefix)
     for bot_name, bot_status in bot_status_by_name.items():
         bot_root = 'bots/' + bot_name
@@ -229,11 +231,13 @@ def get_user_bots(username):
 
 def _get_bot_statuses(bot_name_prefix):
     bot_status_by_name = dict()
+    bot_image_name_prefix = get_bot_image_name(bot_name_prefix)
     containers = docker_client.containers.list(all=True)
     for container in containers:
         for tag in container.image.tags:
-            if tag.startswith(bot_name_prefix):
-                bot_name = tag[:tag.find(':')]
+            if tag.startswith(bot_image_name_prefix):
+                bot_image_name = tag[:tag.find(':')]
+                bot_name = extract_bot_name_from_image(bot_image_name)
                 bot_status = container.status
                 if bot_name in bot_status_by_name:
                     if bot_status > bot_status_by_name[bot_name]:

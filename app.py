@@ -14,6 +14,8 @@ import json
 import deployer
 import dev_config as config
 
+from naming import normalize_username, get_bot_filename, get_bot_name
+
 app = Flask(__name__)
 app.config.from_object(__name__)
 
@@ -110,11 +112,9 @@ def upload_file():
 		flash('No selected file')
 		return redirect(request.url)
 	if file and allowed_file(file.filename):
-		filename = secure_filename(file.filename)
-		username = secure_filename(github.get('user').get('login'))
-		filename = username + "-" + filename
-		filename = filename.lower()
-		file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+		username = github.get('user').get('login')
+		bot_filename = get_bot_filename(username, file.filename)
+		file.save(os.path.join(app.config['UPLOAD_FOLDER'], bot_filename))
 		return success_response(message="Bot uploaded successfully. Now you need to process it.")
 
 @app.route('/uploads/<filename>')
@@ -169,10 +169,10 @@ def do_process_bot():
 	data = request.get_json(force=True)
 	if not data.get('name', False):
 		return error_response("Specify a bot name.")
-	username = secure_filename(github.get('user').get('login'))
-	bot_root = username + "-" + secure_filename(data.get('name'))
-	bot_root = bot_root.lower()
-	deployer.extract_file(bot_root)
+	username = github.get('user').get('login')
+	bot_zip_name = get_bot_filename(username, data.get('name') + '.zip')
+	bot_zip_path = os.path.join(app.config['UPLOAD_FOLDER'], bot_zip_name)
+	bot_root = deployer.extract_file(bot_zip_path)
 	if not deployer.check_and_load_structure(bot_root):
 		return error_response("Failure. Something's wrong with your zip file.")
 	deployer.create_docker_image(bot_root)
@@ -184,10 +184,9 @@ def do_start_bot():
 	data = request.get_json(force=True)
 	if not data.get('name', False):
 		return error_response("Specify a bot name.")
-	username = secure_filename(github.get('user').get('login'))
-	bot_root = username + "-" + secure_filename(data.get('name'))
-	bot_root = bot_root.lower()
-	if deployer.start_bot(bot_root):
+	username = github.get('user').get('login')
+	bot_name = get_bot_name(username, data.get('name'))
+	if deployer.start_bot(bot_name):
 		return success_response()
 	return error_response()
 
@@ -197,10 +196,8 @@ def do_stop_bot():
 	data = request.get_json(force=True)
 	if not data.get('name', False):
 		return error_response("Specify a bot name.")
-	username = secure_filename(github.get('user').get('login'))
-	bot_root = username + "-" + secure_filename(data.get('name'))
-	bot_root = bot_root.lower()
-	deployer.stop_bot(bot_root)
+	bot_name = get_bot_name(github.get('user').get('login'), data.get('name'))
+	deployer.stop_bot(bot_name)
 	return success_response()
 
 @app.route('/bots/logs/<botname>', methods=['GET'])
@@ -210,10 +207,9 @@ def do_get_log(botname, **kwargs):
 	lines = data.get('lines', None)
 	if not data.get('name', False):
 		return error_response("Specify a bot name.")
-	username = secure_filename(github.get('user').get('login'))
-	bot_root = username + "-" + secure_filename(data.get('name'))
-	bot_root = bot_root.lower()
-	logs = deployer.bot_log(bot_root, lines=lines)
+	username = github.get('user').get('login')
+	bot_name = get_bot_name(username, data.get('name'))
+	logs = deployer.bot_log(bot_name, lines=lines)
 	return success_response(logs=dict(content=logs))
 
 @app.route('/bots/delete', methods=['POST'])
@@ -222,17 +218,16 @@ def do_delete_bot():
 	data = request.get_json(force=True)
 	if not data.get('name', False):
 		return error_response("Specify a bot name")
-	username = secure_filename(github.get('user').get('login'))
-	bot_root = username + "-" + secure_filename(data.get('name'))
-	bot_root = bot_root.lower()
-	if not deployer.delete_bot(bot_root):
+	username = github.get('user').get('login')
+	bot_name = get_bot_name(username, data.get('name'))
+	if not deployer.delete_bot(bot_name):
 		return error_response()
 	return success_response()
 
 @app.route('/bots/list', methods=['GET'])
 @apikey_check
 def do_list_bots():
-	username = secure_filename(github.get('user').get('login'))
+	username = normalize_username(github.get('user').get('login'))
 	bots = deployer.get_user_bots(username)
 	return success_response(bots=dict(list=bots))
 
