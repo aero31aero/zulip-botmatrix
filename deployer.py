@@ -238,10 +238,7 @@ def get_user_bots(username):
     bot_name_prefix = get_bot_name(username, '')
     bot_status_by_name = _get_bot_statuses(bot_name_prefix)
     for bot_name, bot_status in bot_status_by_name.items():
-        bot_root = get_bot_root(bot_name)
-        config = get_config(bot_root)
-        zuliprc_file = os.path.join(bot_root, config['zuliprc'])
-        zuliprc = read_config_item(zuliprc_file, 'api')
+        zuliprc = _read_bot_zuliprc(bot_name)
         bot_info = dict(
             name=bot_name[len(bot_name_prefix):], # remove 'username-' prefix
             status=bot_status,
@@ -250,6 +247,12 @@ def get_user_bots(username):
         )
         bots.append(bot_info)
     return bots
+
+def _read_bot_zuliprc(bot_name):
+    bot_root = get_bot_root(bot_name)
+    config = get_config(bot_root)
+    zuliprc_file = os.path.join(bot_root, config['zuliprc'])
+    return read_config_item(zuliprc_file, 'api')
 
 def _get_bot_statuses(bot_name_prefix):
     bot_status_by_name = dict()
