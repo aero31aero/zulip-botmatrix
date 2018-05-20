@@ -15,21 +15,49 @@ class DockerImages:
     def __init__(self, images: List[DockerImage]):
         self.images = images
 
+    def remove(self, image, force):
+        self.images = [docker_image for docker_image in self.images if docker_image.id != image]
+
+    def contains(self, image_id):
+        return image_id in [image.id for image in self.images]
+
 class DockerContainer:
-    def __init__(self, id: str, image: DockerImage, status: str):
+    def __init__(self, id: str, image: DockerImage, status: str, logs=''):
         self.id = id
+        self.short_id = id
         self.image = image
         self.status = status
+        self._logs = logs
+
+    def setOwner(self, owner):
+        self._owner = owner
 
     def is_running(self):
-        return self.    status == 'running'
+        return self.status == 'running'
+
+    def logs(self):
+        return bytearray(self._logs, 'utf-8')
+
+    def stop(self):
+        self.status = 'exited'
+
+    def remove(self, v, force):
+        self._owner._onContainerRemoved(self.id)
 
 class DockerContainers:
     def __init__(self, containers: List[DockerContainer]):
         self.containers = containers
+        for container in containers:
+            container.setOwner(self)
 
-    def list(self):
-        return [container for container in self.containers if container.is_running()]
+    def list(self, all=False):
+        return [container for container in self.containers if all or container.is_running()]
+
+    def get(self, container_id):
+        return next(container for container in self.containers if container.id == container_id)
+
+    def contains(self, container_id):
+        return container_id in [container.id for container in self.containers]
 
     def run(self, image, **kwargs):
         for container in self.containers:
@@ -40,6 +68,9 @@ class DockerContainers:
                     container.status = 'running'
                     return container
         raise ImageNotFound('Image \'{}\' not found'.format(image))
+
+    def _onContainerRemoved(self, container_id):
+        self.containers = [container for container in self.containers if container.id != container_id]
 
 class TestDockerEnvironment:
     def __init__(self,
@@ -70,7 +101,8 @@ class TestDockerEnvironment:
         return DockerContainer(
             id=container['id'], 
             image=images[container['image_id']], 
-            status=container['status']
+            status=container['status'],
+            logs=container.get('logs', '')
         )
 
 class FakeDockerClient(object):
