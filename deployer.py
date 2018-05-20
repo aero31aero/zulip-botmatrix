@@ -201,7 +201,7 @@ def _delete_bot_image(image_id):
 
 def _delete_bot_files(bot_name):
     bot_root = get_bot_root(bot_name)
-    if Path(bot_root).is_dir:
+    if Path(bot_root).is_dir():
         shutil.rmtree(bot_root)
         print("Bot dir was removed.")
     else:
