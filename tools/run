@@ -3,4 +3,4 @@
 BASEDIR=`dirname $0`/..
 
 source $BASEDIR/env/bin/activate
-python app.py
+python $BASEDIR/app.py
